@@ -1,0 +1,14 @@
+# Datum must match <spherical_coordinates> in worlds/lawn_field.sdf and the
+# datum in config/navsat_transform.yaml. Keep it off the equator: at lat 0 the
+# robot's north/south travel flips UTM hemisphere and the northing jumps by
+# 10,000,000m, which throws the GPS-fused pose away entirely.
+datum:
+  lat: 45.0
+  lon: 9.0
+
+# 20m x 20m square centred on the datum (+/-10m in ENU)
+corners:
+  - {lat: 45.00008998, lon: 8.99987317}   # NW
+  - {lat: 45.00008998, lon: 9.00012683}   # NE
+  - {lat: 44.99991002, lon: 9.00012683}   # SE
+  - {lat: 44.99991002, lon: 8.99987317}   # SW
