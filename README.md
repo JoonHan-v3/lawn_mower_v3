@@ -34,11 +34,11 @@ Camera-based obstacle detection/classification and obstacle-aware replanning dur
   - `launch/display.launch.xml` — view the robot in RViz only (no simulation).
   - `rviz/urdf_config.rviz` — RViz display configuration.
 
-- **`mower3_bringup`** — simulation, localization, navigation, and coverage-planning bring-up.
+- **`mower3_bringup`** — simulation, localization, and navigation bring-up.
   - `worlds/lawn_field.sdf` — a 22 × 22 m grass field, anchored to a real-world lat/lon origin (`spherical_coordinates`, default 45.0 N / 9.0 E) for GPS simulation, with the default Gazebo GUI layout and a video-recorder toolbar button. Loads three sensor system plugins: `Sensors` (rendering sensors — lidar), `Imu`, and `NavSat`. All three are required; `Sensors` alone drives only the lidar, and without the other two the IMU and GPS advertise their topics but never publish.
   - `launch/mower.launch.xml` — launches Gazebo, spawns the robot, and starts `robot_state_publisher`, the ROS↔Gazebo bridge, the grass-cutting trail node, wheel odometry, the local + global EKFs, `navsat_transform_node`, and RViz.
   - `launch/navigation.launch.xml` — starts the Nav2 stack (controller, planner, behavior server, BT navigator, lifecycle manager), operating in the `map` frame.
-  - `launch/coverage.launch.xml` — starts the coverage-planning pipeline: boundary loader, coverage planner, and coverage executor.
+  - `launch/coverage.launch.xml` — starts the coverage-planning pipeline: `mower3_coverage`'s boundary loader, coverage planner, and coverage executor nodes.
   - `config/gazebo_bridge.yaml` — topic bridge between ROS 2 and Gazebo: clock, `/cmd_vel`, `/joint_states`, `/scan` (lidar), `/imu`, `/gps/fix`, blade command, and ground-truth pose (used to validate odometry drift, not as a navigation input).
   - `config/ekf_local.yaml` — local `robot_localization` EKF (`odom` frame), fusing wheel odometry and IMU yaw.
   - `config/ekf_global.yaml` — global `robot_localization` EKF (`map` frame), additionally fusing GPS-derived odometry.
@@ -47,11 +47,13 @@ Camera-based obstacle detection/classification and obstacle-aware replanning dur
   - `config/nav2_params.yaml` — Nav2 controller/planner/costmap parameters. The global costmap is non-rolling and field-sized (30 × 30 m at origin −15, −15) so it contains the whole boundary plus margin.
   - `scripts/wheel_odometry.py` — computes odometry from wheel joint states and publishes `/odom`. Integrates on every `/joint_states` sample but publishes at a capped `publish_rate` (default 50 Hz), with the twist averaged over the publish window — `/joint_states` arrives in the hundreds of Hz, which is both wasteful and noisy for the EKF.
   - `scripts/grass_mower.py` — paints a mowed trail behind the deck while the blade is spinning, using the robot's ground-truth simulated pose (not odometry, which drifts). Paints one `patch_radius` (0.24 m) disc every `trail_spacing` (0.25 m) of travel, accumulated and spawned `batch_size` at a time (default 25) as a single Gazebo model holding many visuals, via a non-blocking subprocess. Both the batching and the spacing exist to bound rendering cost — see [Troubleshooting](#troubleshooting) on the trail slowing the simulation down.
-  - `scripts/boundary_loader.py` — converts `boundary.yaml`'s lat/lon corners into a `map`-frame polygon (`/mow_boundary`).
-  - `scripts/coverage_planner.py` — insets the boundary by `boundary_inset`, sweeps it into a serpentine coverage path, and resamples it at `point_spacing` before publishing `/coverage_path`.
-  - `scripts/coverage_executor.py` — asks the global planner for an approach path to the coverage start, concatenates it with the sweep, and drives the whole thing as one `FollowPath` goal.
-  - `scripts/coverage_checker.py` — (diagnostic) reconstructs the mowed area from ground truth and reports what percentage of the boundary was actually cut, publishing uncovered gaps to `/coverage_gaps` for RViz.
-  - `scripts/path_tracking_monitor.py` — (diagnostic) compares the planned path, the EKF pose Nav2 steers by, and Gazebo ground truth, to tell controller-tracking problems apart from localization problems.
+
+- **`mower3_coverage`** — GPS-anchored coverage path planning and execution, launched by `mower3_bringup`'s `coverage.launch.xml`.
+  - `boundary_loader.py` — converts `mower3_bringup`'s `config/boundary.yaml` lat/lon corners into a `map`-frame polygon (`/mow_boundary`).
+  - `coverage_planner.py` — insets the boundary by `boundary_inset`, sweeps it into a serpentine coverage path, and resamples it at `point_spacing` before publishing `/coverage_path`.
+  - `coverage_executor.py` — asks the global planner for an approach path to the coverage start, concatenates it with the sweep, and drives the whole thing as one `FollowPath` goal.
+  - `coverage_checker.py` — (diagnostic) reconstructs the mowed area from ground truth and reports what percentage of the boundary was actually cut, publishing uncovered gaps to `/coverage_gaps` for RViz.
+  - `path_tracking_monitor.py` — (diagnostic) compares the planned path, the EKF pose Nav2 steers by, and Gazebo ground truth, to tell controller-tracking problems apart from localization problems.
 
 ## Prerequisites
 
@@ -149,13 +151,13 @@ Two diagnostic nodes are included. Run either alongside a coverage run and Ctrl-
 
 **Did it actually mow everything?**
 ```
-ros2 run mower3_bringup coverage_checker.py
+ros2 run mower3_coverage coverage_checker.py
 ```
 Reconstructs the mowed area from ground truth, intersects it with the boundary, and reports a coverage percentage plus a pass/fail against `coverage_threshold` (default 0.95). Uncovered gaps are published as outlines on `/coverage_gaps` — add it as a Marker Array in RViz to see exactly where it missed.
 
 **Is it driving where it thinks it is?**
 ```
-ros2 run mower3_bringup path_tracking_monitor.py
+ros2 run mower3_coverage path_tracking_monitor.py
 ```
 Reports cross-track error of both the EKF estimate and ground truth against the planned path, plus the gap between the two. A healthy run looks like this:
 
