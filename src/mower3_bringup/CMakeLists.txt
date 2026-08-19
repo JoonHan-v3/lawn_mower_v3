@@ -13,11 +13,6 @@ install(
 install(PROGRAMS
   scripts/wheel_odometry.py
   scripts/grass_mower.py
-  scripts/boundary_loader.py
-  scripts/coverage_planner.py
-  scripts/coverage_executor.py
-  scripts/coverage_checker.py
-  scripts/path_tracking_monitor.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
