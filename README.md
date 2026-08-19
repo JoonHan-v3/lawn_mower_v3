@@ -85,15 +85,7 @@ source install/setup.bash
 ```
 ros2 launch mower3_bringup mower.launch.xml
 ```
-
-**Terminal 2 — drive it with the keyboard:**
-```
-ros2 run teleop_twist_keyboard teleop_twist_keyboard
-```
-
-Stop teleop before running Nav2 or the coverage pipeline — it publishes to `/cmd_vel`, the same topic the Nav2 controller drives, and the two will fight over the wheels while every log stays clean.
-
-**Terminal 3 — spin up the blade** (send `0.0` to stop it):
+**Terminal 2 — spin up the blade** (send `0.0` to stop it):
 ```
 ros2 topic pub --once /blade_cmd_vel std_msgs/msg/Float64 "{data: 30.0}"
 ```
@@ -102,19 +94,10 @@ Drive around with the blade spinning and a lighter-green mowed trail will appear
 
 ## Running autonomous navigation
 
-With the simulation already running (Terminal 1 above):
-
 **Terminal 2 — start the Nav2 stack** (now operating in the `map` frame):
 ```
 ros2 launch mower3_bringup navigation.launch.xml
 ```
-
-**Terminal 3 — send it a goal** (in the `map` frame — GPS/IMU-anchored, so it's a persistent global position rather than relative to wherever the robot happened to start):
-```
-ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
-  "{pose: {header: {frame_id: map}, pose: {position: {x: 2.0, y: 0.0}}}}"
-```
-Or use RViz2's "2D Goal Pose" tool. The robot will plan a path and avoid anything the lidar sees — add a static obstacle to `lawn_field.sdf` to see it route around something.
 
 ## Running full-lawn coverage
 
